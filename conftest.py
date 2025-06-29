@@ -1,44 +1,40 @@
-import allure
 import pytest
-from selenium.webdriver.chrome import webdriver
-from selenium.webdriver.firefox import webdriver
 from selenium import webdriver
+import requests
+import urls
+import data
+from helpers import Generator
 
-from data.urls import Urls
-from web_locators import UIWorkerLocators
-from web_pages import UIWorkerWeb
 
-
-@allure.step('Открытие браузер')
-@pytest.fixture(params=['chrome', 'firefox'])
-def driver_do(request):
-    if request.param == 'chrome':
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument('--headless')
-        driver = webdriver.Chrome(options=chrome_options)
-        driver.set_window_size(1920, 1080)
-        driver.get(Urls.url_main)
-    elif request.param == 'firefox':
-        firefox_options = webdriver.FirefoxOptions()
-        firefox_options.add_argument('--headless')
-        driver = webdriver.Firefox(options=firefox_options)
-        driver.set_window_size(1920, 1080)
-        driver.get(Urls.url_main)
+@pytest.fixture(params=[data.browser_chrome, data.browser_firefox])
+def driver(request):
+    if request.param == data.browser_chrome:
+        data.DRIVER_NAME = data.browser_chrome
+        driver = webdriver.Chrome()
+    elif request.param == data.browser_firefox:
+        data.DRIVER_NAME = data.browser_firefox
+        driver = webdriver.Firefox()
+    driver.maximize_window()
+    driver.get(urls.BASE_URL)
     yield driver
     driver.quit()
 
 
-@pytest.fixture(scope='function')
-def pages(driver_do):
-    """инициализирует класс с selenium driver"""
-    driver = driver_do
-    pages = UIWorkerWeb(driver, UIWorkerLocators())
-    return pages
+@pytest.fixture()
+def create_new_user_and_delete():
+    email = Generator.generate_random_email(5)
+    password = Generator.generate_random_string(7)
+    name = Generator.generate_random_string(7)
 
-@pytest.fixture(scope='function')
-def login(pages):
-    """ Войти в аккаунт """
-    pages.login()
+    payload = {
+        "email": email,
+        "password": password,
+        "name": name
+    }
 
-
-
+    response = requests.post(urls.USER_REGISTER_ENDPOINT, json=payload)
+    response_json = response.json()
+    token = response_json.get('accessToken')
+    yield email, password, token
+    headers = {'Authorization': token[1]}
+    requests.delete(urls.USER_DELETE_ENDPOINT, headers=headers)

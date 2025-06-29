@@ -1,55 +1,80 @@
-import time
-
 import allure
-import pytest
 
-from data.urls import Urls
+from pages.account_page import AccountPage
+from pages.main_page import MainPage
+from pages.login_page import LoginPage
+from pages.order_feed_page import OrderFeedPage
 
 
 class TestMainPage:
 
-    @allure.title('При нажатии в header кнопки «Лента заказов» совершается переход на страницу заказов')
-    @allure.description('При нажатии в header кнопки "Лента заказов" происходит редирект на страницу со всеми заказами')
-    def test_redirection_to_order_list(self, pages):
-        pages.click_orders_list_button()
-        current_url = pages.get_current_url()
-        assert current_url == Urls.url_feed
+    @allure.title('Проверка перехода в раздел конструктора')
+    def test_click_constructor_link(self, driver, create_new_user_and_delete):
+        main_page = MainPage(driver)
+        main_page.click_account_button()
+        email, password, _ = create_new_user_and_delete
+        login_page = LoginPage(driver)
+        login_page.user_login(email, password)
+        account_page = AccountPage(driver)
+        account_page.close_modal_for_ff()
+        main_page.click_account_button()
+        main_page.click_constructor_link()
+        expected_result = 'Соберите бургер'
 
-    @allure.title('При нажатии в header кнопки "Конструктор" совершается переход на старницу сбора бургера')
-    @allure.description('При нажатии в header кнопки "Конструктор"  происходит редирект на страницу со всеми заказами')
-    def test_go_to_constructor(self, pages):
-        pages.click_orders_list_button()
-        pages.click_constructor_button()
-        current_url = pages.get_current_url()
-        assert current_url == Urls.url_main
+        assert main_page.check_constructor_title() == expected_result
 
-    @allure.title('При нажатии на ингридиент всплывает окно с информаций')
-    @allure.description('При нажатии на игридиент всплывает модальное окно с информацией об ингридиенте')
-    def test_popup_of_ingredient(self, pages):
-        pages.click_on_ingredient()
-        actually_text = pages.check_show_window_with_details()
-        assert actually_text == "Детали ингредиента"
+    @allure.title('Проверка перехода в ленту заказов')
+    def test_click_feed_link(self, driver, create_new_user_and_delete):
+        email, password, _ = create_new_user_and_delete
+        main_page = MainPage(driver)
+        main_page.click_login_button()
+        email, password, _ = create_new_user_and_delete
+        login_page = LoginPage(driver)
+        login_page.user_login(email, password)
+        account_page = AccountPage(driver)
+        account_page.close_modal_for_ff()
+        main_page.get_feed()
+        main_page.get_feed()
+        order_feed_page = OrderFeedPage(driver)
+        expected_result = 'Лента заказов'
 
-    @allure.title('При нажатии в модальном окне с информацией об ингридиенте крестика , окно закрывается')
-    @allure.description('Нажимает на крестик в правом верхнем углу окна и проверяем, что всплывающее окно закрылось')
-    def test_close_ingredient_details_window(self, pages):
-        pages.click_on_ingredient()
-        pages.click_cross_button()
-        pages.invisibility_ingredient_details()
-        assert pages.check_displayed_ingredient_details() == False
+        assert order_feed_page.check_feed_title_text() == expected_result
 
-    @allure.title('При добавлении ингридиента в заказ, счетчик увеличивается')
-    @allure.description('Проверяем что после добавления ингридиента счетчик ингридента сменился')
-    def test_ingredient_counter(self, pages):
-        prev_counter_value = pages.get_count_value()
-        pages.add_filling_to_order()
-        actual_value = pages.get_count_value()
-        assert actual_value > prev_counter_value
+    @allure.title('Проверка открытия модального окна с информацией об ингредиенте')
+    def test_ingredient_details_modal_opened(self, driver):
+        main_page = MainPage(driver)
+        main_page.get_ingredient_details()
+        expected_result = 'Детали ингредиента'
 
-    @allure.title('Проверка возможности оформления заказ авторизованным пользователем')
-    @allure.description('Нажимаем кнопку «Оформить заказ» и проверяем, что заказ оформлен и появился идентификатор заказа')
-    def test_successful_order(self, pages, login):
-        pages.add_filling_to_order()
-        pages.click_order_button()
-        actually_text = pages.check_show_window_with_order_id()
-        assert actually_text == "идентификатор заказа" and pages.check_displayed_order_status_text() == True
+        assert main_page.check_ingredient_title_text() == expected_result
+
+    @allure.title('Проверка закрытия модального окна с информацией об ингредиенте')
+    def test_ingredient_details_modal_closed(self, driver):
+        main_page = MainPage(driver)
+        main_page.get_ingredient_details()
+        main_page.close_ingredient_details_modal()
+        expected_result = 'Соусы'
+
+        assert main_page.check_ingredient_details_modal_closed() == expected_result
+
+    @allure.title('Проверка увеличения количества ингредиентов при добавлении в корзину')
+    def test_add_ingredient_to_basket_count_increased(self, driver):
+        main_page = MainPage(driver)
+        before_ingredient_added = main_page.check_count_before_ingredient_added()
+        main_page.add_ingredient()
+        after_ingredient_added = main_page.check_count_after_ingredient_added()
+
+        assert int(after_ingredient_added) > int(before_ingredient_added)
+
+    @allure.title('Проверка возможности сделать заказ авторизованному пользователю')
+    def test_make_order_authorized(self, driver, create_new_user_and_delete):
+        email, password, _ = create_new_user_and_delete
+        main_page = MainPage(driver)
+        main_page.click_login_button()
+        email, password, _ = create_new_user_and_delete
+        login_page = LoginPage(driver)
+        login_page.user_login(email, password)
+        main_page.make_order()
+        expected_result = 'идентификатор заказа'
+
+        assert main_page.check_order_id_text() == expected_result
